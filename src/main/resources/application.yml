@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: "24083"
+
+  # Секреты хранятся в .env (не коммитится) или в переменных окружения.
+  config:
+    import: optional:file:.env[.properties]
+
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://127.0.0.1:5432/museum}
+    username: ${DB_USERNAME:museum_app}
+    password: ${DB_PASSWORD:}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+  # Схему и тестовые данные создаёт владелец схемы,
+  # приложение работает под ограниченным пользователем museum_app.
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      data-locations: classpath:data.sql
+      username: ${DB_INIT_USERNAME}
+      password: ${DB_INIT_PASSWORD}
+
+server:
+  port: 8080
+
+logging:
+  level:
+    org.hibernate.SQL: info

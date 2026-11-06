@@ -1,0 +1,1665 @@
+{
+  "info": {
+    "name": "Lab1 RBPO — Музейные выставки",
+    "description": "Коллекция демонстрирует работу REST API музея: CRUD по всем сущностям и пять бизнес-операций.\n\nПорядок запуска: коллекция рассчитана на последовательное выполнение сверху вниз (Collection Runner). Папка «1. Сценарий» создаёт собственные данные и проводит их через все бизнес-операции, папки 2–6 проверяют CRUD по каждой сущности, папка 8 (необязательная) удаляет созданные сценарием данные.\n\nПеред запуском: приложение должно работать на http://127.0.0.1:8080, в БД должны быть тестовые данные (data.sql). Логины: admin/admin123, curator/curator123.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      {
+        "key": "username",
+        "value": "{{curatorUser}}",
+        "type": "string"
+      },
+      {
+        "key": "password",
+        "value": "{{curatorPassword}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Даты выставки и уникальный суффикс имён для повторных запусков.",
+          "const pad = n => String(n).padStart(2, '0');",
+          "const fmt = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:00`;",
+          "const now = new Date();",
+          "pm.collectionVariables.set('startDate', fmt(new Date(now.getTime() - 86400000)));",
+          "pm.collectionVariables.set('endDate', fmt(new Date(now.getTime() + 30 * 86400000)));",
+          "if (!pm.collectionVariables.get('runId')) {",
+          "    pm.collectionVariables.set('runId', String(Date.now()).slice(-6));",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8080",
+      "type": "string"
+    },
+    {
+      "key": "adminUser",
+      "value": "admin",
+      "type": "string"
+    },
+    {
+      "key": "adminPassword",
+      "value": "admin123",
+      "type": "string"
+    },
+    {
+      "key": "curatorUser",
+      "value": "curator",
+      "type": "string"
+    },
+    {
+      "key": "curatorPassword",
+      "value": "curator123",
+      "type": "string"
+    },
+    {
+      "key": "runId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "startDate",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "endDate",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "hallAId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "hallBId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "exhibitId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "exhibitionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "placementId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "crudUserId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "crudHallId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "crudExhibitId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "crudExhibitionId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "crudPlacementId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "placementExhibitId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "placementExhibitionId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Сценарий: от данных до операций",
+      "item": [
+        {
+          "name": "Статус сервиса (без авторизации)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/status",
+            "description": "Публичный эндпоинт, аутентификация не требуется.",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Сервис доступен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус приложения в ответе\", () => pm.expect(pm.response.json()).to.have.property(\"status\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать зал А (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls",
+            "description": "Создание зала доступно только роли ADMIN.",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Зал Экспедиций {{runId}}\",\n  \"area\": 60.00,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"hallAId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать зал Б (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Зал Малый {{runId}}\",\n  \"area\": 40.00,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"hallBId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать экспонат (CURATOR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inventoryNumber\": \"INV-{{runId}}\",\n  \"name\": \"Каменный идол {{runId}}\",\n  \"condition\": \"GOOD\",\n  \"requiredArea\": 4.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"exhibitId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать выставку (CURATOR)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Северные древности {{runId}}\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"status\": \"PLANNED\",\n  \"curatorId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка создана\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"exhibitionId\", pm.response.json().id);",
+                  "pm.test(\"Статус PLANNED\", () => pm.expect(pm.response.json().status).to.eql(\"PLANNED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Бизнес-операция 1: разместить экспонат в зале А",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/placements",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exhibitionId\": {{exhibitionId}},\n  \"exhibitId\": {{exhibitId}},\n  \"hallId\": {{hallAId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат размещён\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Размещение запланировано\", () => pm.expect(pm.response.json().status).to.eql(\"PLANNED\"));",
+                  "pm.collectionVariables.set(\"placementId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Бизнес-операция 2: переместить экспонат в зал Б",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/placements/{{placementId}}/move",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"hallId\": {{hallBId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат перемещён\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Экспонат в новом зале\", () => pm.expect(pm.response.json().hall.id).to.eql(Number(pm.collectionVariables.get(\"hallBId\"))));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Бизнес-операция 3: открыть выставку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/exhibitions/{{exhibitionId}}/open"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка открыта\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус ACTIVE\", () => pm.expect(pm.response.json().status).to.eql(\"ACTIVE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверить состояние выставки после открытия",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions/{{exhibitionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка доступна\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус ACTIVE\", () => pm.expect(pm.response.json().status).to.eql(\"ACTIVE\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Негативный сценарий: реставрация при активной выставке",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/exhibits/{{exhibitId}}/restoration",
+            "description": "Экспонат участвует в активной выставке — бизнес-правило возвращает 409."
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Операция запрещена\", () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Бизнес-операция 4: закрыть выставку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/exhibitions/{{exhibitionId}}/close"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка закрыта\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус COMPLETED\", () => pm.expect(pm.response.json().status).to.eql(\"COMPLETED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Бизнес-операция 5: отправить экспонат на реставрацию",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/business/exhibits/{{exhibitId}}/restoration"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат отправлен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Состояние RESTORATION\", () => pm.expect(pm.response.json().condition).to.eql(\"RESTORATION\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Проверить изменения состояния экспоната",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits/{{exhibitId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат доступен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Состояние RESTORATION\", () => pm.expect(pm.response.json().condition).to.eql(\"RESTORATION\"));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Создаём залы, экспонат и выставку, размещаем экспонат, перемещаем его, открываем и закрываем выставку, отправляем экспонат на реставрацию. Каждый шаг зависит от состояния, созданного предыдущими запросами."
+    },
+    {
+      "name": "2. CRUD: пользователи (ADMIN)",
+      "item": [
+        {
+          "name": "Список пользователей",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Список получен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"В списке есть пользователи\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Пользователь по id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/1",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Пользователь найден\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Логин admin\", () => pm.expect(pm.response.json().username).to.eql(\"admin\"));",
+                  "pm.test(\"Пароль не отдаётся\", () => pm.expect(pm.response.json()).to.not.have.property(\"passwordHash\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать пользователя",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"test_{{runId}}\",\n  \"name\": \"Тестовый куратор\",\n  \"role\": \"CURATOR\",\n  \"password\": \"secret123\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Пользователь создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"crudUserId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Изменить пользователя",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{crudUserId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Тестовый куратор (изменён)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Пользователь изменён\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Имя обновлено\", () => pm.expect(pm.response.json().name).to.eql(\"Тестовый куратор (изменён)\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить пользователя",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/users/{{crudUserId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Пользователь удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3. CRUD: залы (ADMIN)",
+      "item": [
+        {
+          "name": "Список залов",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Список получен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"В списке есть залы\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Зал по id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls/{{hallAId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал найден\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать зал",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Зал Временный {{runId}}\",\n  \"area\": 25.00,\n  \"isAvailable\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"crudHallId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Изменить зал",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls/{{crudHallId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"area\": 30.00,\n  \"isAvailable\": false\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал изменён\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Площадь обновлена\", () => pm.expect(pm.response.json().area).to.eql(30.00));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить зал",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls/{{crudHallId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4. CRUD: экспонаты",
+      "item": [
+        {
+          "name": "Список экспонатов",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Список получен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"В списке есть экспонаты\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Экспонат по id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits/{{exhibitId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат найден\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать экспонат",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inventoryNumber\": \"INV-CRUD-{{runId}}\",\n  \"name\": \"Временный экспонат {{runId}}\",\n  \"condition\": \"GOOD\",\n  \"requiredArea\": 1.50\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"crudExhibitId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Изменить экспонат",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits/{{crudExhibitId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Временный экспонат (изменён)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат изменён\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить экспонат",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits/{{crudExhibitId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5. CRUD: выставки",
+      "item": [
+        {
+          "name": "Список выставок",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Список получен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"В списке есть выставки\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Выставка по id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions/{{exhibitionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка найдена\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать выставку",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Временная выставка {{runId}}\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"status\": \"PLANNED\",\n  \"curatorId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка создана\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"crudExhibitionId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Изменить выставку",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions/{{crudExhibitionId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Временная выставка (изменена)\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка изменена\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить выставку",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions/{{crudExhibitionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка удалена\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6. CRUD: размещения",
+      "item": [
+        {
+          "name": "Подготовить экспонат для размещения",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"inventoryNumber\": \"INV-PLACE-{{runId}}\",\n  \"name\": \"Экспонат для размещения {{runId}}\",\n  \"condition\": \"GOOD\",\n  \"requiredArea\": 2.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат создан\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"placementExhibitId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Подготовить выставку для размещения",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Выставка для размещения {{runId}}\",\n  \"startDate\": \"{{startDate}}\",\n  \"endDate\": \"{{endDate}}\",\n  \"status\": \"PLANNED\",\n  \"curatorId\": 2\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка создана\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"placementExhibitionId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Создать размещение",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibit-placements",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"exhibitId\": {{placementExhibitId}},\n  \"exhibitionId\": {{placementExhibitionId}},\n  \"hallId\": {{hallAId}}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Размещение создано\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"crudPlacementId\", pm.response.json().id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Размещение по id",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibit-placements/{{crudPlacementId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Размещение найдено\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Список размещений",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibit-placements"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Список получен\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"В списке есть размещения\", () => pm.expect(pm.response.json()).to.be.an(\"array\").that.is.not.empty);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Изменить размещение",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibit-placements/{{crudPlacementId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"INSTALLED\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Размещение изменено\", () => pm.response.to.have.status(200));",
+                  "pm.test(\"Статус INSTALLED\", () => pm.expect(pm.response.json().status).to.eql(\"INSTALLED\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить размещение",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibit-placements/{{crudPlacementId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Размещение удалено\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить подготовленную выставку",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions/{{placementExhibitionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка удалена\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить подготовленный экспонат",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits/{{placementExhibitId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "7. Очистка сценария (необязательно)",
+      "item": [
+        {
+          "name": "Удалить выставку сценария",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibitions/{{exhibitionId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Выставка удалена\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить экспонат сценария",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/exhibits/{{exhibitId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Экспонат удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить зал А",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls/{{hallAId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Удалить зал Б",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/api/halls/{{hallBId}}",
+            "auth": {
+              "type": "basic",
+              "basic": [
+                {
+                  "key": "username",
+                  "value": "{{adminUser}}",
+                  "type": "string"
+                },
+                {
+                  "key": "password",
+                  "value": "{{adminPassword}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Зал удалён\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ],
+      "description": "Удаляет данные, созданные папкой 1. Запускайте отдельно, если не нужны результаты сценария в базе."
+    }
+  ]
+}
