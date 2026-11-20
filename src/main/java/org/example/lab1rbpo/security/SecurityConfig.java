@@ -5,6 +5,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -18,14 +19,17 @@ import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 import java.nio.charset.StandardCharsets;
 
-/**
- * HTTP Basic + роли ADMIN/CURATOR + CSRF (cookie-based, т.к. сессии STATELESS).
- * Управление пользователями и залами доступно только ADMIN.
- */
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity
 public class SecurityConfig {
+
+    // NEW: внедряем фильтр
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+
+    public SecurityConfig(JwtAuthenticationFilter jwtAuthenticationFilter) {
+        this.jwtAuthenticationFilter = jwtAuthenticationFilter;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -45,12 +49,14 @@ public class SecurityConfig {
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/hello", "/api/status", "/error",
-                                "/api/auth/register", "/api/auth/csrf").permitAll()
+                                "/api/auth/register", "/api/auth/csrf",
+                                "/auth/login", "/auth/register", "/auth/refresh").permitAll()
                         .requestMatchers("/api/users/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/halls/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.PATCH, "/api/halls/**").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.DELETE, "/api/halls/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class) // NEW
                 .httpBasic(Customizer.withDefaults())
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) ->

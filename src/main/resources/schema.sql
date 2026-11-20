@@ -59,6 +59,22 @@ CREATE TABLE IF NOT EXISTS exhibit_placement (
     CONSTRAINT ck_placement_status CHECK (status IN ('PLANNED', 'INSTALLED', 'REMOVED')),
     CONSTRAINT ck_placement_removed_at CHECK ((status = 'REMOVED') = (removed_at IS NOT NULL))
 );
+CREATE TABLE IF NOT EXISTS user_sessions (
+                                             id                   UUID        PRIMARY KEY,
+                                             username             VARCHAR(64) NOT NULL,
+    device_id            VARCHAR(255),
+    access_token         TEXT        NOT NULL,
+    refresh_token        TEXT        NOT NULL,
+    access_token_expiry  TIMESTAMP   NOT NULL,
+    refresh_token_expiry TIMESTAMP   NOT NULL,
+    status               VARCHAR(20) NOT NULL,
+    CONSTRAINT uk_user_sessions_refresh_token UNIQUE (refresh_token),
+    CONSTRAINT ck_user_sessions_status CHECK (status IN ('ACTIVE', 'USED', 'REVOKED'))
+    );
+
+CREATE INDEX IF NOT EXISTS idx_user_sessions_username ON user_sessions (username);
+
+GRANT SELECT, INSERT, UPDATE ON user_sessions TO museum_app;
 
 CREATE INDEX IF NOT EXISTS idx_exhibition_curator ON exhibition (curator_id);
 CREATE INDEX IF NOT EXISTS idx_placement_hall ON exhibit_placement (hall_id);
